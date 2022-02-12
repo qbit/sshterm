@@ -6,6 +6,8 @@ import (
 	"flag"
 	"image/color"
 	"log"
+	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	"github.com/fyne-io/terminal"
 	"github.com/fyne-io/terminal/cmd/fyneterm/data"
@@ -106,9 +109,17 @@ func runSSH(host, user, pass string, t *termResizer, w fyne.Window, a fyne.App) 
 	if !strings.Contains(host, ":") {
 		host = host + ":22"
 	}
+
+	socket := os.Getenv("SSH_AUTH_SOCK")
+	agentConn, err := net.Dial("unix", socket)
+	if err != nil {
+		log.Printf("Failed to open SSH_AUTH_SOCK: %v\n", err)
+	}
+	agentClient := agent.NewClient(agentConn)
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
+			ssh.PublicKeysCallback(agentClient.Signers),
 			ssh.Password(pass),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
